@@ -37,10 +37,10 @@ export default defineConfig({
     trace: 'on-first-retry',
 
     /* Collect screenshot when retrying the failed test. */
-    screenshot: "only-on-failure",
+    screenshot: "on",
 
     /* Collect video when retrying the failed test. */
-    video: 'retain-on-failure',
+    video: 'on',
 
     // headless: process.env.CI ? true : false, // CI vs local
 
