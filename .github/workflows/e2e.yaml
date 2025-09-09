@@ -1,0 +1,105 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2025 CESNET z.s.p.o.
+# OARepo is free software; you can redistribute it and/or modify
+# it under the terms of the MIT License; see LICENSE file for more details.
+
+name: E2E Tests
+on: [push, pull_request]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  e2e_tests:
+    name: E2E tests
+    runs-on: ubuntu-24.04
+    env:
+      PYTHON_VERSION: "3.13"
+      NODE_VERSION: "24"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        uses: ./.github/actions/install_dependencies
+        with:
+          python_version: ${{ env.PYTHON_VERSION }}
+          node_version: ${{ env.NODE_VERSION }}
+
+      - name: Install E2E tests
+        shell: bash
+        run: |
+          # this section is needed before @inveniosoftware/invenio-e2e is released
+          cat <<EOF >pnpm-workspace.yaml
+          packages:
+            - 'e2e'
+            - 'invenio-e2e'
+          EOF
+          git clone https://github.com/oarepo/invenio-e2e.git
+          (
+            cd invenio-e2e
+            git switch deposition-page-ms
+          )
+          # end of section
+
+          cd e2e
+          pnpm install
+          npx playwright install
+
+      - name: Run services
+        shell: bash
+        run: |
+          docker compose up -d 
+
+      - name: Install RDM
+        shell: bash
+        run: |
+          invenio-cli install
+
+      - name: Setup repository
+        shell: bash
+        run: |
+          echo "CELERY_ALWAYS_EAGER=True" >> invenio.cfg
+          export INVENIO_CELERY_ALWAYS_EAGER=True
+          invenio-cli services setup
+          pipenv run invenio users create -a -c test@test.com --password testtest
+
+      - name: Run the repository
+        shell: bash
+        run: |
+          invenio-cli run web &
+          sleep 10
+
+      - name: Run E2E tests
+        shell: bash
+        run: |
+          cd e2e
+          # TODO: can not call pnpx here, seems not to work with links
+          export INVENIO_USER_EMAIL=test@test.com
+          export INVENIO_USER_PASSWORD=testtest
+          npx playwright test
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: e2e/playwright-report
+
+  upload_report:
+    name: Upload E2E Report to GitHub Pages
+    runs-on: ubuntu-24.04
+    needs: e2e_tests
+    if: always()
+    concurrency:
+      group: "pages"
+      cancel-in-progress: false
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
