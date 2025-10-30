@@ -1,7 +1,7 @@
-import { setupApiTesting } from "@inveniosoftware/invenio-e2e";
+import { appConfig, setupApiTesting } from "@inveniosoftware/invenio-e2e";
 
 import path from 'path';
 
-const authFilePath = path.join(__dirname, '../../playwright/.auth/user.json');
+const authFileAbsolutePath = path.resolve(__dirname, '../../', appConfig.authUserFilePath);
 
-setupApiTesting(authFilePath);
+setupApiTesting(authFileAbsolutePath);
