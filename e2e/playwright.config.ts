@@ -1,5 +1,6 @@
-import { defineConfig, devices } from '@playwright/test';
 import 'module-alias/register';
+import { appConfig } from '@inveniosoftware/invenio-e2e';
+import { defineConfig, devices } from '@playwright/test';
 
 /**
  * Read environment variables from file.
@@ -24,11 +25,31 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   timeout: 10_000,
-  reporter: 'html',
+  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
+  // Multiple reporters (console + HTML + Qase)
+  reporter: [
+    ["list"],
+    ["html", { outputFolder: "playwright-report", open: "never" }],
+    // ...(appConfig.qase
+    //   ? [
+    //       [
+    //         "playwright-qase-reporter",
+    //         {
+    //           apiToken: appConfig.qase.apiToken,
+    //           projectCode: appConfig.qase.projectCode,
+    //           runName: appConfig.qase.runName || `E2E Run - ${new Date().toISOString()}`,
+    //           environment: appConfig.qase.environment,
+    //           rootSuiteTitle: appConfig.qase.rootSuiteTitle,
+    //           runComplete: appConfig.qase.runComplete,
+    //         },
+    //       ] as const,
+    //     ]
+    //   : []),
+  ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'https://127.0.0.1:5000/',
+    baseURL: appConfig.baseURL,
 
     /* Allow self-signed certificates */
     ignoreHTTPSErrors: true,
@@ -53,19 +74,31 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      testIgnore: /api\/.*/,
       use: { ...devices['Desktop Chrome'] },
     },
-    /*
-        {
-          name: 'firefox',
-          use: { ...devices['Desktop Firefox'] },
-        },
-    
-        {
-          name: 'webkit',
-          use: { ...devices['Desktop Safari'] },
-        },
-    */
+    // {
+    //   name: 'firefox',
+    //   use: { ...devices['Desktop Firefox'] },
+    // },
+
+    // {
+    //   name: 'webkit',
+    //   use: { ...devices['Desktop Safari'] },
+    // },
+
+    /* API Testing */
+    { name: 'API Testing Setup', 
+      testMatch: /api\/.*\.setup\.ts$/ 
+    },
+    {
+      name: 'API',
+      testMatch: /api\/.*\.spec.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      dependencies: ['API Testing Setup'],
+    },
     /* Test against mobile viewports. */
     // {
     //   name: 'Mobile Chrome',
